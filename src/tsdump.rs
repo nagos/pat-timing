@@ -14,13 +14,14 @@ pub struct TsDump {
 #[derive(Debug)]
 pub struct TsBlock {
     pub ts: u32,
+    data: Vec<u8>,
 }
 
 impl Iterator for TsDump {
     type Item = TsBlock;
     fn next(&mut self) -> Option<Self::Item> {
-        let data: &mut [u8] = &mut [0; BLOCK_SIZE*HEADER_SIZE+4];
-        match self.fh.read_exact(data){
+        let mut data = Vec::with_capacity(BLOCK_SIZE*HEADER_SIZE+4);
+        match self.fh.by_ref().take(data.capacity() as u64).read_to_end(&mut data){
             Ok(_) => Some(self.parse_block(data)),
             Err(_) => None,
         }
@@ -47,19 +48,12 @@ fn ts_diff(ts1: u32, ts2: u32) -> i32 {
 }
 
 impl TsDump {
-    fn parse_block(&self, data: &[u8]) -> TsBlock {
-        let ts = extract_ts(data);
+    fn parse_block(&self, data: Vec<u8>) -> TsBlock {
+        let ts = extract_ts(data.as_slice());
         TsBlock { 
             ts,
+            data,
          }
-    }
-
-    fn extract_ts(&self, data: &[u8]) -> u32 {
-        let ts_data = &data[TS_OFFSET..TS_OFFSET+4];
-         (ts_data[3] as u32) <<0
-            | (ts_data[2] as u32) <<8
-            | (ts_data[1] as u32) <<16
-            | (ts_data[0] as u32) <<24
     }
 }
 
@@ -70,15 +64,24 @@ impl TsDump {
     }
 }
 
+impl TsBlock {
+    pub fn packet(&self, i: usize) -> &[u8] {
+        let start = HEADER_SIZE*i;
+        let end = start+HEADER_SIZE;
+        &self.data.as_slice()[start..end]
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     #[test]
     fn block_parse() {
         let mut i = TsDump::build("testdata/record_1.ts");
-        dbg!(i.next());
-        dbg!(i.next());
-        dbg!(i.next());
+        let q = i.next().unwrap();
+        assert_eq!(q.packet(0), [71, 0, 18, 20]);
+        assert_eq!(q.packet(1), [71, 21, 55, 22]);
+        assert_eq!(q.ts, 115239864);
     }
 
     #[test]
