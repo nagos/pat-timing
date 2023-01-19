@@ -2,26 +2,28 @@ use std::io::Read;
 use std::iter::Iterator;
 use std::fs::File;
 
-pub struct TsDump {
-    fh: File,
-}
-
 const BLOCK_SIZE: usize = 7;
 const HEADER_SIZE: usize = 4;
 const TS_OFFSET: usize = BLOCK_SIZE*HEADER_SIZE;
 const MAX_TS: i32  = 0x7FFFFFF;
 
+pub struct TsDump {
+    fh: File,
+}
+
+#[derive(Debug)]
+pub struct TsBlock {
+    pub ts: u32,
+}
+
 impl Iterator for TsDump {
-    type Item = usize;
+    type Item = TsBlock;
     fn next(&mut self) -> Option<Self::Item> {
         let data: &mut [u8] = &mut [0; BLOCK_SIZE*HEADER_SIZE+4];
         match self.fh.read_exact(data){
-            Ok(_) => {},
-            Err(_) => return None,
+            Ok(_) => Some(self.parse_block(data)),
+            Err(_) => None,
         }
-        self.parse_block(data);
-        dbg!(data);
-        Some(1)
     }
 }
 
@@ -45,8 +47,11 @@ fn ts_diff(ts1: u32, ts2: u32) -> i32 {
 }
 
 impl TsDump {
-    fn parse_block(&self, data: &[u8]) {
+    fn parse_block(&self, data: &[u8]) -> TsBlock {
         let ts = extract_ts(data);
+        TsBlock { 
+            ts,
+         }
     }
 
     fn extract_ts(&self, data: &[u8]) -> u32 {
@@ -69,7 +74,7 @@ impl TsDump {
 mod tests {
     use super::*;
     #[test]
-    fn test() {
+    fn block_parse() {
         let mut i = TsDump::build("testdata/record_1.ts");
         dbg!(i.next());
         dbg!(i.next());
