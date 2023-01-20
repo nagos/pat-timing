@@ -2,10 +2,11 @@ use std::io::Read;
 use std::iter::Iterator;
 use std::fs::File;
 
-const BLOCK_SIZE: usize = 7;
+pub const BLOCK_SIZE: usize = 7;
 const HEADER_SIZE: usize = 4;
 const TS_OFFSET: usize = BLOCK_SIZE*HEADER_SIZE;
 const MAX_TS: i32  = 0x7FFFFFF;
+const BLOCK_LEN: usize = BLOCK_SIZE*HEADER_SIZE+4;
 
 pub struct TsDump {
     fh: File,
@@ -20,9 +21,11 @@ pub struct TsBlock {
 impl Iterator for TsDump {
     type Item = TsBlock;
     fn next(&mut self) -> Option<Self::Item> {
-        let mut data = Vec::with_capacity(BLOCK_SIZE*HEADER_SIZE+4);
-        match self.fh.by_ref().take(data.capacity() as u64).read_to_end(&mut data){
-            Ok(_) => Some(self.parse_block(data)),
+        let mut data = vec![0; BLOCK_LEN];
+        match self.fh.by_ref().read_exact(&mut data){
+            Ok(_) => {
+                Some(self.parse_block(data))
+            },
             Err(_) => None,
         }
     }
@@ -36,7 +39,7 @@ fn extract_ts(data: &[u8]) -> u32 {
         | (ts_data[0] as u32) <<24
 }
 
-fn ts_diff(ts1: u32, ts2: u32) -> i32 {
+pub fn ts_diff(ts1: u32, ts2: u32) -> i32 {
     let d = ts1 as i32 - ts2 as i32;
     if d > (MAX_TS+1)/2 {
         return d as i32 -(MAX_TS+1) as i32;
@@ -69,6 +72,15 @@ impl TsBlock {
         let start = HEADER_SIZE*i;
         let end = start+HEADER_SIZE;
         &self.data.as_slice()[start..end]
+    }
+}
+
+impl Default for TsBlock {
+    fn default() -> Self {
+        TsBlock { 
+            ts: 0, 
+            data: vec![0; BLOCK_LEN]
+        }
     }
 }
 
