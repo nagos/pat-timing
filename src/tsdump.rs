@@ -10,6 +10,9 @@ const BLOCK_LEN: usize = BLOCK_SIZE*HEADER_SIZE+4;
 
 pub struct TsDump {
     fh: File,
+    ts_init: bool,
+    ts: u32,
+    ts_prev: u32,
 }
 
 #[derive(Debug)]
@@ -50,11 +53,22 @@ pub fn ts_diff(ts1: u32, ts2: u32) -> i32 {
     return d;
 }
 
+pub fn ts_to_us(ts: i32) -> i32 {
+    ts / 75
+}
+
 impl TsDump {
-    fn parse_block(&self, data: Vec<u8>) -> TsBlock {
+    fn parse_block(&mut self, data: Vec<u8>) -> TsBlock {
         let ts = extract_ts(data.as_slice());
+        if self.ts_init {
+            self.ts = ts;
+            self.ts_prev = ts;
+            self.ts_init = false;
+        }
+        self.ts = self.ts.overflowing_add(ts_diff(ts, self.ts_prev) as u32).0 & (MAX_TS as u32);
+        self.ts_prev = ts;
         TsBlock { 
-            ts,
+            ts: self.ts,
             data,
          }
     }
@@ -63,7 +77,12 @@ impl TsDump {
 impl TsDump {
     pub fn build(fname: &str) -> TsDump {
         let fh = File::open(fname).unwrap();
-        TsDump{fh}
+        TsDump{
+            fh,
+            ts_prev: 0,
+            ts_init: true,
+            ts: 0,
+        }
     }
 }
 
@@ -107,5 +126,16 @@ mod tests {
         assert_eq!(d2, -100);
         let d3 = ts_diff(t3, t2);
         assert_eq!(d3, -25);
+
+        let t4: u32 = 2801941399;
+        let t5: u32 = 2802805678;
+        let d4 = ts_diff(t4, t5);
+        assert_eq!(d4, -864279);
+    }
+
+    #[test]
+    fn ts_to_us_test() {
+        let v = ts_to_us(-865109);
+        assert_eq!(v, -11534);
     }
 }

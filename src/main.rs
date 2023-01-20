@@ -4,8 +4,8 @@ use pat_timing::tsdump;
 const PAT_PID: u32 = 0;
 
 fn check_pair((a, b): (pat_timing::PacketData, pat_timing::PacketData)) {
-    let diff = tsdump::ts_diff(a.0, b.0);
-    dbg!(diff);
+    let diff = tsdump::ts_to_us(tsdump::ts_diff(a.0, b.0));
+    println!("{}", diff);
 }
 
 fn filter_data(x: &pat_timing::PacketData) -> bool {
