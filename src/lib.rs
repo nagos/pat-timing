@@ -1,6 +1,7 @@
 pub mod tsdump;
 
 pub type PacketData = (u32, u32, u32);
+const PAT_PID: u32 = 0;
 
 fn parse_packet(packet: &[u8]) -> (u32, u32) {
     let pid = ((packet[1]&0x1f) as u32) << 8
@@ -17,6 +18,14 @@ pub fn block_process(block: tsdump::TsBlock) -> Vec<PacketData> {
         ret.push((block.ts, pid, cc));
     }
     ret
+}
+
+pub fn filter_data(x: &PacketData) -> bool {
+    if x.1 == PAT_PID && x.2 == 0 {
+        true
+    } else {
+        false
+    }
 }
 
 #[cfg(test)]
@@ -38,7 +47,6 @@ mod tests {
         let i = tsdump::TsDump::build("testdata/record_1.ts");
         let mut q = i.flat_map(block_process);
         let d1 = q.next().unwrap();
-        dbg!(&d1);
         assert_eq!(d1, (115239864, 0x12, 4));
         let d2 = q.next().unwrap();
         assert_eq!(d2, (115239864, 0x1537, 6));
