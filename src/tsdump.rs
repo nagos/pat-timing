@@ -1,6 +1,5 @@
 use std::io::Read;
 use std::iter::Iterator;
-use std::fs::File;
 
 pub const BLOCK_SIZE: usize = 7;
 const HEADER_SIZE: usize = 4;
@@ -9,7 +8,7 @@ const MAX_TS: i32  = 0x7FFFFFF;
 const BLOCK_LEN: usize = BLOCK_SIZE*HEADER_SIZE+4;
 
 pub struct TsDump {
-    fh: File,
+    fh: Box<dyn Read>,
     ts_init: bool,
     ts: u32,
     ts_prev: u32,
@@ -75,10 +74,12 @@ impl TsDump {
 }
 
 impl TsDump {
-    pub fn build(fname: &str) -> TsDump {
-        let fh = File::open(fname).unwrap();
+    pub fn build<T>(fh: T) -> TsDump 
+    where 
+        T: Read + 'static,
+    {
         TsDump{
-            fh,
+            fh: Box::new(fh),
             ts_prev: 0,
             ts_init: true,
             ts: 0,
@@ -108,7 +109,17 @@ mod tests {
     use super::*;
     #[test]
     fn block_parse() {
-        let mut i = TsDump::build("testdata/record_1.ts");
+        let data: &[u8] = &[
+            0x47, 0x00, 0x12, 0x14, 
+            0x47, 0x15, 0x37, 0x16, 
+            0x47, 0x15, 0x41, 0x12, 
+            0x47, 0x15, 0x2d, 0x1f, 
+            0x47, 0x00, 0xc9, 0x1f, 
+            0x47, 0x0f, 0xe8, 0x1c, 
+            0x47, 0x00, 0x65, 0x10, 
+            0x06, 0xde, 0x6b, 0xb8,
+        ];
+        let mut i = TsDump::build(data);
         let q = i.next().unwrap();
         assert_eq!(q.packet(0), [71, 0, 18, 20]);
         assert_eq!(q.packet(1), [71, 21, 55, 22]);

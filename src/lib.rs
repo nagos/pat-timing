@@ -33,9 +33,20 @@ mod tests {
     use super::*;
     use crate::tsdump;
 
+    const DATA: &[u8] = &[
+            0x47, 0x00, 0x12, 0x14, 
+            0x47, 0x15, 0x37, 0x16, 
+            0x47, 0x15, 0x41, 0x12, 
+            0x47, 0x15, 0x2d, 0x1f, 
+            0x47, 0x00, 0xc9, 0x1f, 
+            0x47, 0x0f, 0xe8, 0x1c, 
+            0x47, 0x00, 0x65, 0x10, 
+            0x06, 0xde, 0x6b, 0xb8,
+        ];
+
     #[test]
     fn block_process_test() {
-        let mut i = tsdump::TsDump::build("testdata/record_1.ts");
+        let mut i = tsdump::TsDump::build(DATA);
         let p = i.next().unwrap();
         let d = block_process(p);
         assert_eq!(d[0], (115239864, 0x12, 4));
@@ -44,7 +55,7 @@ mod tests {
     
     #[test]
     fn block_iterator_test() {
-        let i = tsdump::TsDump::build("testdata/record_1.ts");
+        let i = tsdump::TsDump::build(DATA);
         let mut q = i.flat_map(block_process);
         let d1 = q.next().unwrap();
         assert_eq!(d1, (115239864, 0x12, 4));
